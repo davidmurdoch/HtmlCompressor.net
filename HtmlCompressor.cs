@@ -127,13 +127,14 @@ namespace HtmlCompressor
         private static readonly Regex TagQuotePattern = new Regex("\\s*=\\s*([\"'])([a-z0-9-_]+?)\\1(?=[^<]*?>)",
                                                                   RegexOptions.IgnoreCase);
 
-        private static readonly Regex PrePattern = new Regex("(<pre[^>]*?>)(.*?)(</pre>)", RegexOptions.IgnoreCase);
+        private static readonly Regex PrePattern = new Regex("(<pre\b[^>]*?>)((?:(?!</pre>)<[^<]*)*)(</pre>)", RegexOptions.IgnoreCase);
 
-        private static readonly Regex TaPattern = new Regex("(<textarea[^>]*?>)(.*?)(</textarea>)",
+        private static readonly Regex TaPattern = new Regex("(<textarea\b[^>]*?>)((?:(?!</textarea>)<[^<]*)*)(</textarea>)",
                                                             RegexOptions.IgnoreCase);
 
 
-        private static readonly Regex ScriptPattern =
+        private static readonly Regex ScriptPattern
+ =
             new Regex("(<script\b[^>]*?>)((?:(?!</script>)<[^<]*)*)(</script>)", RegexOptions.IgnoreCase);
 
 
@@ -267,60 +268,14 @@ namespace HtmlCompressor
 
         #endregion
 
-        private static string DoReplacement(string html, Regex pattern, IList block, string replacement,
-                                            int groupToSaveIndex = 1)
+        private static string DoReplacement(string html, Regex pattern, IList block, string replacement, int groupToSaveIndex = 1)
         {
-            int index = 0;
-            int lastValue = 0;
-
-            var sb = new StringBuilder();
-
-            MatchCollection matcher = pattern.Matches(html);
-            foreach (Match match in matcher)
-            {
-                string matchValue = match.Groups[groupToSaveIndex].Value;
-                if (matchValue.Trim().Length <= 0)
-                {
-                    continue;
-                }
-
-                sb.Append(html.Substring(lastValue, match.Index - lastValue));
-                sb.Append(match.Result(string.Format(replacement, index++)));
-
-                block.Add(matchValue);
-
-                lastValue = match.Index + match.Length;
-            }
-
-            sb.Append(html.Substring(lastValue));
-
-            return sb.ToString();
+            return pattern.Replace(html, m => string.Format(replacement, block.Add(m.Groups[groupToSaveIndex].Value), m.Groups[groupToSaveIndex].Value));
         }
 
         private static string DoReInsert(string html, Regex tempPattern, IList block)
         {
-            int lastValue = 0;
-
-            var sb = new StringBuilder();
-
-            MatchCollection matcher = tempPattern.Matches(html);
-            foreach (Match match in matcher)
-            {
-                string matchValue = match.Groups[1].Value;
-                if (matchValue.Trim().Length <= 0)
-                {
-                    continue;
-                }
-
-                sb.Append(html.Substring(lastValue, match.Index - lastValue));
-                sb.Append(block[int.Parse(matchValue)]);
-
-                lastValue = match.Index + match.Length;
-            }
-
-            sb.Append(html.Substring(lastValue));
-
-            return sb.ToString();
+            return tempPattern.Replace(html, m => block[int.Parse(m.Groups[1].Value)].ToString());
         }
 
 
@@ -346,7 +301,7 @@ namespace HtmlCompressor
             html = DoReplacement(html, EventPattern2, eventBlocks, "$1" + TempEventBlock + "$3");
 
             //preserve PRE tags
-            html = DoReplacement(html, PrePattern, preBlocks, "$1" + TempPreBlock + "$3");
+            html = DoReplacement(html, PrePattern, preBlocks, TempPreBlock);
 
             //preserve SCRIPT tags
             html = DoReplacement(html, ScriptPattern, scriptBlocks, TempScriptBlock);
@@ -355,7 +310,7 @@ namespace HtmlCompressor
             html = DoReplacement(html, StylePattern, styleBlocks, "$1" + TempStyleBlock + "$3");
 
             //preserve TEXTAREA tags
-            html = DoReplacement(html, TaPattern, taBlocks, "$1" + TempTextAreaBlock + "$3");
+            html = DoReplacement(html, TaPattern, taBlocks, TempTextAreaBlock);
 
             return html;
         }
